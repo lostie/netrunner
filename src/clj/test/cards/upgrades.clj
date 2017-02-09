@@ -275,6 +275,45 @@
       (is (zero? (get-counters (refresh cache) :virus))
           "Cache has no counters"))))
 
+(deftest disposable-hq
+  ;; Disposable HQ
+  (do-game
+    (new-game (default-corp [(qty "Jackson Howard" 3) (qty "Disposable HQ" 1) (qty "AstroScript Pilot Program" 1)])
+              (default-runner))
+    (starting-hand state :corp ["Jackson Howard" "Jackson Howard" "Jackson Howard" "Disposable HQ"])
+    (play-from-hand state :corp "Disposable HQ" "HQ")
+    (take-credits state :corp)
+    (is (= 3 (count (:hand (get-corp)))))
+    (let [dhq (get-content state :hq 0) ]
+      (core/gain state :runner :credit 8)
+      (run-on state "HQ")
+      (run-successful state)
+      ;; runner now chooses which to access.
+      (prompt-choice :runner "Card from hand")
+      (prompt-choice :runner "Yes")
+      (is (= 1 (count (:discard (get-corp)))) "One copy of Jackson Howard trashed")
+      (is (= 2 (count (:hand (get-corp)))))
+      (core/draw state :corp)
+      (is (= 3 (count (:hand (get-corp)))))
+      (is (= 0 (count (:deck (get-corp)))))
+      (let [hand-astro (find-card "AstroScript Pilot Program" (:hand (get-corp)))
+            hand-jackson (find-card "Jackson Howard" (:hand (get-corp)))]
+        (prompt-choice :runner "Unrezzed upgrade in HQ")
+        (is (prompt-is-card? :corp dhq) "Corp is asked to choose cards to dispose to R&D")
+        (is (prompt-is-type? :runner :waiting) "Runner has prompt to wait for Corp to resolve Disposable HQ")
+        (prompt-choice :corp "Yes")
+        (prompt-select :corp hand-astro)
+        (prompt-select :corp hand-jackson)
+        (is (= 1 (count (:hand (get-corp)))) "Astro and one Jackson are removed from HQ")
+        (is (= 2 (count (:deck (get-corp)))) "Astro and one Jackson are now at the bottom of R&D")
+        (prompt-choice :corp "Done")
+        (is (not (prompt-is-type? :runner :waiting)) "Runner is now asked if it wants to trash Disposable HQ")
+        (prompt-choice :runner "Yes")
+        (is (empty? (get-content state :hq 0)) "Disposable HQ no longer in the root of HQ")
+        (is (= 2 (count (:discard (get-corp)))) "Disposable HQ is in Archives")
+        (is (= 1 (count (:hand (get-corp)))))))
+    ))
+
 (deftest ghost-branch-dedicated-response-team
   ;; Ghost Branch - with Dedicated Response Team
   (do-game
